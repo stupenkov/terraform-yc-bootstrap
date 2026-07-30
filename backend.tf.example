@@ -1,22 +1,7 @@
-# After the first local-state apply creates the bucket, copy this file to backend.tf,
-# fill bucket name from `terraform output -raw tfstate_bucket` (or backend_config_hint),
-# load credentials (`source .backend-credentials`), then:
-#   terraform init -migrate-state
+# Advanced / manual path — prefer: docker compose run --rm bootstrap
 #
-# Prefer running via: docker run ... stupean/yandex-terraform init -migrate-state
-
-terraform {
-  backend "s3" {
-    endpoints = {
-      s3 = "https://storage.yandexcloud.net"
-    }
-    bucket = "REPLACE_WITH_tfstate_bucket_OUTPUT"
-    region = "ru-central1"
-    key    = "bootstrap/terraform.tfstate"
-
-    skip_region_validation      = true
-    skip_credentials_validation = true
-    skip_requesting_account_id  = true
-    skip_s3_checksum            = true
-  }
-}
+# 1. First apply with local state (no backend.tf in the tree).
+# 2. cp backend.tf.in backend.tf
+# 3. Write backend.hcl with bucket/key (see outputs tfstate_bucket, bootstrap_state_key).
+# 4. Load AWS keys via Docker --env-file .backend-credentials (KEY=VALUE format).
+# 5. terraform init -migrate-state -force-copy -backend-config=backend.hcl

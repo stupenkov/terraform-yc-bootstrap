@@ -49,11 +49,15 @@ output "tfstate_secret_key" {
 output "backend_config_hint" {
   description = "Hints for configuring the S3 backend after first apply"
   value = {
-    endpoint         = "https://storage.yandexcloud.net"
-    bucket           = yandex_storage_bucket.tfstate.bucket
-    region           = "ru-central1"
-    key              = var.bootstrap_state_key
-    credentials_file = var.write_backend_credentials ? var.backend_credentials_path : null
-    example_file     = "backend.tf.example"
+    endpoint           = "https://storage.yandexcloud.net"
+    bucket             = yandex_storage_bucket.tfstate.bucket
+    region             = "ru-central1"
+    key                = var.bootstrap_state_key
+    credentials_file   = var.write_backend_credentials ? var.backend_credentials_path : null
+    credentials_format = "env-file KEY=VALUE (Docker --env-file / Compose env_file)"
+    backend_file       = "backend.tf (from backend.tf.in)"
+    backend_template   = "backend.tf.in"
+    backend_config_hcl = "backend.hcl"
+    init_migrate = "terraform init -migrate-state -force-copy -backend-config=backend.hcl"
   }
 }

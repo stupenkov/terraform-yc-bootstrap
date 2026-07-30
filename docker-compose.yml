@@ -1,0 +1,22 @@
+# Pin: bump digest when intentionally upgrading the runtime image (see README).
+x-runtime: &runtime
+  image: stupean/yandex-terraform@sha256:e55da7ecc64d3cff1048900f856b84ec6228e2568f1b64f09154500f932bd417
+  working_dir: /app
+  volumes:
+    - .:/app
+  # Credentials come from env_file and/or `docker compose run -e VAR`.
+  # Do NOT use `KEY: ${KEY:-}` here — empty defaults override env_file values.
+  env_file:
+    - path: .env
+      required: false
+    - path: .backend-credentials
+      required: false
+
+services:
+  tf:
+    <<: *runtime
+
+  # Image entrypoint is always `terraform`; override to run the bootstrap script.
+  bootstrap:
+    <<: *runtime
+    entrypoint: ["/bin/bash", "./scripts/bootstrap.sh"]

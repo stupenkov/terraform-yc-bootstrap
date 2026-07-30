@@ -1,4 +1,5 @@
-# Copy to terraform.tfvars and fill in. Do not commit terraform.tfvars.
+# Optional alternative to TF_VAR_* in .env (happy path uses .env — see .env.example).
+# Copy to terraform.tfvars only if you prefer HCL tfvars. Do not commit terraform.tfvars.
 
 # Reuse an existing cloud (leave cloud_id empty to create a new one):
 # cloud_id = "b1gxxxxxxxxxxxxxxxx"
@@ -17,6 +18,6 @@ folder_names = {
   platform = "platform"
 }
 
-bucket_name_prefix     = "tfstate"
-bootstrap_state_key    = "bootstrap/terraform.tfstate"
+bucket_name_prefix        = "tfstate"
+bootstrap_state_key       = "bootstrap/terraform.tfstate"
 write_backend_credentials = true

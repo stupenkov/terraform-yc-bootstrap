@@ -2,7 +2,9 @@
 .terraform/
 *.tfstate
 *.tfstate.*
+.terraform.tfstate.lock.info
 *.tfplan
+tfplan
 crash.log
 crash.*.log
 override.tf
@@ -13,6 +15,8 @@ override.tf.json
 # Credentials / local secrets
 .env
 .backend-credentials
+backend.hcl
+backend.tf
 *.pem
 *sa-key*.json
 *authorized_key*.json
