@@ -16,7 +16,12 @@ services:
   tf:
     <<: *runtime
 
-  # Image entrypoint is always `terraform`; override to run the bootstrap script.
+  # Image entrypoint is always `terraform`; override for orchestration scripts.
   bootstrap:
     <<: *runtime
     entrypoint: ["/bin/bash", "./scripts/bootstrap.sh"]
+
+  # Attach-only (never creates a new cloud).
+  join:
+    <<: *runtime
+    entrypoint: ["/bin/bash", "./scripts/join.sh"]

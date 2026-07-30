@@ -53,11 +53,13 @@ output "backend_config_hint" {
     bucket             = yandex_storage_bucket.tfstate.bucket
     region             = "ru-central1"
     key                = var.bootstrap_state_key
+    workspace_meta_key = local.workspace_meta_key
     credentials_file   = var.write_backend_credentials ? var.backend_credentials_path : null
     credentials_format = "env-file KEY=VALUE (Docker --env-file / Compose env_file)"
     backend_file       = "backend.tf (from backend.tf.in)"
     backend_template   = "backend.tf.in"
     backend_config_hcl = "backend.hcl"
-    init_migrate = "terraform init -migrate-state -force-copy -backend-config=backend.hcl"
+    init_migrate       = "terraform init -migrate-state -force-copy -backend-config=backend.hcl"
+    join_hint          = "docker compose run --rm join  # or smart bootstrap with YC_TOKEN only"
   }
 }

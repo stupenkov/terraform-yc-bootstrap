@@ -14,6 +14,7 @@ override.tf.json
 
 # Credentials / local secrets
 .env
+.workspace.env
 .backend-credentials
 backend.hcl
 backend.tf
