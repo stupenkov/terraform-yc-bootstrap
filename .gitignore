@@ -1,0 +1,29 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Credentials / local secrets
+.env
+.backend-credentials
+*.pem
+*sa-key*.json
+*authorized_key*.json
+
+# tfvars with secrets (keep *.example tracked)
+terraform.tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store

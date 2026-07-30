@@ -1,0 +1,22 @@
+# Copy to terraform.tfvars and fill in. Do not commit terraform.tfvars.
+
+# Reuse an existing cloud (leave cloud_id empty to create a new one):
+# cloud_id = "b1gxxxxxxxxxxxxxxxx"
+
+# Required when creating a new cloud:
+organization_id    = "bpfxxxxxxxxxxxxxxxx"
+billing_account_id = "dn2xxxxxxxxxxxxxxxx"
+cloud_name         = "main"
+
+zone = "ru-central1-d"
+
+folder_names = {
+  prod     = "prod"
+  stage    = "stage"
+  dev      = "dev"
+  platform = "platform"
+}
+
+bucket_name_prefix     = "tfstate"
+bootstrap_state_key    = "bootstrap/terraform.tfstate"
+write_backend_credentials = true
