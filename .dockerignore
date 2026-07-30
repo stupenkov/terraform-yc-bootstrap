@@ -1,0 +1,30 @@
+# Secrets and local state — never bake into the image
+.env
+.env.*
+!.env.example
+**/.backend-credentials
+**/.workspace.env
+**/*.tfstate
+**/*.tfstate.*
+**/tfplan
+**/*.tfplan
+**/.terraform/
+**/backend.tf
+**/backend.hcl
+**/terraform.tfvars
+**/*.auto.tfvars
+**/*.auto.tfvars.json
+**/*sa-key*.json
+**/*authorized_key*.json
+**/*.pem
+
+# Repo / tooling noise
+.git/
+.cursor/
+openspec/
+examples/
+.yc-bootstrap-work/
+README.md
+docker-compose.yml
+.gitignore
+.dockerignore

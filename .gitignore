@@ -1,5 +1,6 @@
-# Terraform
+# Terraform (module + work dirs)
 .terraform/
+**/.terraform/
 *.tfstate
 *.tfstate.*
 .terraform.tfstate.lock.info
@@ -12,20 +13,28 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
-# Credentials / local secrets
+# Credentials / local secrets (repo root or terraform/ work dir)
 .env
 .workspace.env
 .backend-credentials
+terraform/.workspace.env
+terraform/.backend-credentials
 backend.hcl
 backend.tf
+terraform/backend.hcl
+terraform/backend.tf
 *.pem
 *sa-key*.json
 *authorized_key*.json
 
-# tfvars with secrets (keep *.example tracked)
+# tfvars with secrets (keep examples/ tracked)
 terraform.tfvars
 *.auto.tfvars
 *.auto.tfvars.json
+terraform/terraform.tfvars
+
+# Consumer docker run work cache (when repo root was mounted as /work by mistake)
+.yc-bootstrap-work/
 
 # IDE / OS
 .idea/

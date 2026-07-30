@@ -2,8 +2,27 @@
 # Shared bootstrap/join helpers (sourced, not executed).
 # shellcheck shell=bash
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-cd "$ROOT_DIR"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPTS_DIR}/.." && pwd)"
+
+# Terraform root:
+# - checkout: <repo>/terraform (sibling of scripts/)
+# - image:    /module with scripts at /module/scripts (parent of scripts/ is the module)
+# Entrypoint may export MODULE_DIR / WORK_DIR explicitly.
+if [[ -z "${MODULE_DIR:-}" ]]; then
+  if [[ -d "${REPO_ROOT}/terraform" ]]; then
+    MODULE_DIR="${REPO_ROOT}/terraform"
+  elif [[ -f "${REPO_ROOT}/backend.tf.in" || -f "${REPO_ROOT}/versions.tf" ]]; then
+    MODULE_DIR="${REPO_ROOT}"
+  else
+    MODULE_DIR="${REPO_ROOT}/terraform"
+  fi
+fi
+# Writable workspace: same as module for Compose; /work for docker run (set by entrypoint).
+WORK_DIR="${WORK_DIR:-${MODULE_DIR}}"
+
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
 
 BACKEND_TEMPLATE="${BACKEND_TEMPLATE:-backend.tf.in}"
 BACKEND_TF="${BACKEND_TF:-backend.tf}"
@@ -34,8 +53,13 @@ prefer_remote() {
 
 ensure_backend_tf() {
   if [[ ! -f "$BACKEND_TF" ]]; then
-    [[ -f "$BACKEND_TEMPLATE" ]] || die "missing ${BACKEND_TEMPLATE}"
-    cp "$BACKEND_TEMPLATE" "$BACKEND_TF"
+    if [[ -f "$BACKEND_TEMPLATE" ]]; then
+      cp "$BACKEND_TEMPLATE" "$BACKEND_TF"
+    elif [[ -f "${MODULE_DIR}/${BACKEND_TEMPLATE}" ]]; then
+      cp "${MODULE_DIR}/${BACKEND_TEMPLATE}" "$BACKEND_TF"
+    else
+      die "missing ${BACKEND_TEMPLATE} (looked in ${WORK_DIR} and ${MODULE_DIR})"
+    fi
     log "Installed ${BACKEND_TF} from ${BACKEND_TEMPLATE}"
   fi
 }
@@ -97,7 +121,8 @@ tf_plan_apply() {
     terraform apply -input=false tfplan
   else
     log "Review the plan above. Set BOOTSTRAP_AUTO_APPROVE=1 in .env and re-run:"
-    log "  docker compose run --rm bootstrap"
+    log "  docker run --rm --env-file .env <image> bootstrap"
+    log "  # or: docker compose run --rm bootstrap"
     rm -f tfplan
     die "refusing to apply without BOOTSTRAP_AUTO_APPROVE=1"
   fi

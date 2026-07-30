@@ -13,5 +13,6 @@ require_yc_auth
 log "Join: attach to existing bootstrap workspace (never creates cloud)"
 attach_workspace require
 tf_plan_only
-log "Join complete. Day-two: docker compose run --rm tf plan|apply"
-log "Optional: merge TF_VAR_cloud_id from .workspace.env into .env"
+log "Join complete. Day-two: docker run --rm --env-file .env -v \"\$PWD:/work\" <image> plan|apply"
+log "  # or: docker compose run --rm tf plan|apply"
+log "Optional: merge TF_VAR_cloud_id from terraform/.workspace.env into .env"
