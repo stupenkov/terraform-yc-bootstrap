@@ -60,7 +60,7 @@ if [[ ! -f "${WORK_DIR}/versions.tf" && ! -f "${WORK_DIR}/backend.tf.in" ]]; the
   fi
 fi
 
-cd "$WORK_DIR"
+cd "$WORK_DIR" || exit
 
 case "$cmd" in
   bootstrap)

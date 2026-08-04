@@ -22,7 +22,7 @@ fi
 WORK_DIR="${WORK_DIR:-${MODULE_DIR}}"
 
 mkdir -p "$WORK_DIR"
-cd "$WORK_DIR"
+cd "$WORK_DIR" || exit
 
 BACKEND_TEMPLATE="${BACKEND_TEMPLATE:-backend.tf.in}"
 BACKEND_TF="${BACKEND_TF:-backend.tf}"
