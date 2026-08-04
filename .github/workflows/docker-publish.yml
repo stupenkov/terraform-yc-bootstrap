@@ -20,6 +20,7 @@ permissions:
 
 jobs:
   publish:
+    name: Build and push to Docker Hub
     runs-on: ubuntu-latest
     steps:
       - name: Resolve tag
@@ -56,3 +57,33 @@ jobs:
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
           github-token: ${{ github.token }}
+
+  dockerhub-description:
+    name: Sync Docker Hub description
+    needs: publish
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dockerhub-description-stupean-terraform-yc-bootstrap
+      cancel-in-progress: false
+    steps:
+      - name: Resolve tag
+        id: ver
+        env:
+          RAW: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${RAW#refs/tags/}"
+          TAG="v${TAG#v}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.ver.outputs.tag }}
+
+      - name: Sync Docker Hub description
+        uses: ./.github/actions/dockerhub-description
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          short-description: ${{ github.event.repository.description }}

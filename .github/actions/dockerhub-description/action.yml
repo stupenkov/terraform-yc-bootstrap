@@ -1,0 +1,73 @@
+name: Sync Docker Hub description
+description: >-
+  Update stupean/terraform-yc-bootstrap Overview (full description) from
+  README.md and set the short description on Docker Hub.
+
+inputs:
+  username:
+    description: Docker Hub username
+    required: true
+  password:
+    description: Docker Hub token (Read/Write/Delete scope recommended for description API)
+    required: true
+  short-description:
+    description: Hub short description (max 100 bytes). Empty → documented fallback.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Require Docker Hub credentials
+      shell: bash
+      env:
+        USERNAME: ${{ inputs.username }}
+        PASSWORD: ${{ inputs.password }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${USERNAME}" || -z "${PASSWORD}" ]]; then
+          echo "DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are empty — set repository Actions secrets" >&2
+          exit 1
+        fi
+
+    - name: Resolve short description
+      id: short
+      shell: bash
+      env:
+        SHORT: ${{ inputs.short-description }}
+      run: |
+        set -euo pipefail
+        FALLBACK="Yandex Cloud landing-zone bootstrap (Docker + Terraform)"
+        VALUE="${SHORT:-}"
+        if [[ -z "${VALUE}" ]]; then
+          VALUE="${FALLBACK}"
+        fi
+        # Hub short-description limit is 100 bytes (not characters).
+        VALUE="$(VALUE="${VALUE}" python3 - <<'PY'
+        import os
+        s = os.environ["VALUE"]
+        raw = s.encode("utf-8")
+        if len(raw) <= 100:
+            print(s, end="")
+        else:
+            cut = raw[:97].decode("utf-8", "ignore") + "..."
+            while len(cut.encode("utf-8")) > 100 and len(cut) > 3:
+                cut = cut[:-4] + "..."
+            print(cut, end="")
+        PY
+        )"
+        {
+          echo "value<<EOF"
+          printf '%s\n' "${VALUE}"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Docker Hub Description
+      uses: peter-evans/dockerhub-description@v5.0.0
+      with:
+        username: ${{ inputs.username }}
+        password: ${{ inputs.password }}
+        repository: stupean/terraform-yc-bootstrap
+        readme-filepath: ./README.md
+        enable-url-completion: true
+        short-description: ${{ steps.short.outputs.value }}

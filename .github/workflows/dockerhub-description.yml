@@ -1,0 +1,32 @@
+name: Docker Hub description
+
+# Docs-only sync when README changes on main (no image rebuild required).
+on:
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - .github/workflows/dockerhub-description.yml
+      - .github/actions/dockerhub-description/**
+
+# Serialize with post-publish description jobs (same Hub repo).
+concurrency:
+  group: dockerhub-description-stupean-terraform-yc-bootstrap
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync Overview to Docker Hub
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Sync Docker Hub description
+        uses: ./.github/actions/dockerhub-description
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          short-description: ${{ github.event.repository.description }}

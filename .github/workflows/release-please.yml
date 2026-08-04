@@ -61,3 +61,24 @@ jobs:
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
           github-token: ${{ github.token }}
+
+  # Separate job: image push can stay green if Overview sync fails; serializes Hub API writes.
+  dockerhub-description:
+    name: Sync Docker Hub description
+    needs: [release-please, publish]
+    if: needs.release-please.outputs.release_created == 'true' && needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: dockerhub-description-stupean-terraform-yc-bootstrap
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+
+      - name: Sync Docker Hub description
+        uses: ./.github/actions/dockerhub-description
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          short-description: ${{ github.event.repository.description }}
