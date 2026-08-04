@@ -1,0 +1,58 @@
+name: Republish Docker image
+
+# Manual rebuild of an existing release tag. Automatic publish: release-please.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing git tag (e.g. v0.1.0)"
+        required: true
+        type: string
+      update_latest:
+        description: "Also move floating tag latest (avoid for older releases)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: ver
+        env:
+          RAW: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${RAW#refs/tags/}"
+          TAG="v${TAG#v}"
+          VERSION="${TAG#v}"
+          if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-].+)?$ ]]; then
+            echo "tag must look like vX.Y.Z, got: ${RAW}" >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.ver.outputs.tag }}
+
+      - name: Ensure GitHub Release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ver.outputs.tag }}
+        run: gh release view "${TAG}" >/dev/null
+
+      - uses: ./.github/actions/publish-image
+        with:
+          version: ${{ steps.ver.outputs.version }}
+          release-tag: ${{ steps.ver.outputs.tag }}
+          update-latest: ${{ inputs.update_latest }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          github-token: ${{ github.token }}

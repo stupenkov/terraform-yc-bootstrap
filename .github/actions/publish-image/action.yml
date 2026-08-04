@@ -1,0 +1,109 @@
+name: Publish bootstrap image
+description: >-
+  Build and push stupean/terraform-yc-bootstrap to Docker Hub, then upsert
+  the image digest into the matching GitHub Release notes.
+
+inputs:
+  version:
+    description: SemVer with or without v prefix (e.g. 0.1.0 or v0.1.0)
+    required: true
+  release-tag:
+    description: GitHub Release / git tag (e.g. v0.1.0)
+    required: true
+  update-latest:
+    description: Also push floating tag latest (disable when republishing an older release)
+    required: false
+    default: "true"
+  dockerhub-username:
+    required: true
+  dockerhub-token:
+    required: true
+  github-token:
+    required: true
+
+outputs:
+  digest:
+    description: Image digest (sha256:…)
+    value: ${{ steps.build.outputs.digest }}
+
+runs:
+  using: composite
+  steps:
+    - name: Normalize inputs
+      id: norm
+      shell: bash
+      env:
+        RAW_VERSION: ${{ inputs.version }}
+        RAW_TAG: ${{ inputs.release-tag }}
+        UPDATE_LATEST: ${{ inputs.update-latest }}
+      run: |
+        set -euo pipefail
+        VERSION="${RAW_VERSION#v}"
+        TAG="${RAW_TAG#refs/tags/}"
+        TAG="v${TAG#v}"
+        case "${UPDATE_LATEST}" in true|True|TRUE|1|yes|YES) LATEST=true ;; *) LATEST=false ;; esac
+        if [[ ! "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-].+)?$ ]]; then
+          echo "bad version='${RAW_VERSION}' tag='${RAW_TAG}'" >&2
+          exit 1
+        fi
+        {
+          echo "version=${VERSION}"
+          echo "tag=${TAG}"
+          echo "update_latest=${LATEST}"
+          echo "tags<<EOF"
+          echo "stupean/terraform-yc-bootstrap:${VERSION}"
+          if [[ "${LATEST}" == "true" ]]; then
+            echo "stupean/terraform-yc-bootstrap:latest"
+          fi
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - uses: docker/setup-buildx-action@v4
+
+    - uses: docker/login-action@v4
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ inputs.dockerhub-token }}
+
+    - name: Build and push
+      id: build
+      uses: docker/build-push-action@v7
+      with:
+        context: .
+        push: true
+        platforms: linux/amd64
+        tags: ${{ steps.norm.outputs.tags }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Upsert digest in GitHub Release notes
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        TAG: ${{ steps.norm.outputs.tag }}
+        VERSION: ${{ steps.norm.outputs.version }}
+        DIGEST: ${{ steps.build.outputs.digest }}
+        UPDATE_LATEST: ${{ steps.norm.outputs.update_latest }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${DIGEST}" || "${DIGEST}" == "null" ]]; then
+          echo "missing image digest" >&2
+          exit 1
+        fi
+        NOTES="$(gh release view "${TAG}" --json body -q .body)"
+        NOTES="$(printf '%s\n' "${NOTES}" | awk '
+          BEGIN { skip = 0 }
+          /^## Docker image[[:space:]]*$/ { skip = 1; next }
+          /^## / { skip = 0 }
+          skip == 0 { print }
+        ')"
+        {
+          printf '%s\n' "${NOTES}"
+          printf '\n## Docker image\n\n'
+          printf -- '- `stupean/terraform-yc-bootstrap:%s`\n' "${VERSION}"
+          printf -- '- `stupean/terraform-yc-bootstrap@%s`\n' "${DIGEST}"
+          if [[ "${UPDATE_LATEST}" == "true" ]]; then
+            printf -- '- convenience tag: `stupean/terraform-yc-bootstrap:latest`\n'
+          fi
+        } > /tmp/release-notes.md
+        gh release edit "${TAG}" --notes-file /tmp/release-notes.md
