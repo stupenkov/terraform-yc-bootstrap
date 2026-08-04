@@ -22,7 +22,7 @@
 
 ## 5. Follow-up: action versions & DRY publish
 
-- [x] 5.1 Bump actions: checkout@v7, setup-terraform@v4, hadolint@v3, docker *@v4/@v7, release-please@v5
+- [x] 5.1 Bump actions: checkout@v7, setup-terraform@v4, hadolint@v3.4.0, docker *@v4/@v7, release-please@v5
 - [x] 5.2 Composite `.github/actions/publish-image` + `docker/metadata-action` для tags
 - [x] 5.3 Подключить composite в `release-please.yml` и `docker-publish.yml`
 - [x] 5.4 Review fixes: `update-latest`, guards, CI smoke без buildx, concurrency, normalize v-prefix

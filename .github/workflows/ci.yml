@@ -40,7 +40,8 @@ jobs:
             scripts/lib/workspace.sh \
             docker/entrypoint.sh
 
-      - uses: hadolint/hadolint-action@v3
+      # No floating @v3 tag — pin a real release (latest: v3.4.0).
+      - uses: hadolint/hadolint-action@v3.4.0
         with:
           dockerfile: Dockerfile
           failure-threshold: error
