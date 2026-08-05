@@ -1,80 +1,117 @@
 # terraform-yc-bootstrap
 
-Создаёт landing zone в Yandex Cloud: облако, каталоги `prod` / `stage` / `dev` / `platform`, bucket для Terraform state и service accounts.
+Создаёт landing zone в Yandex Cloud: облако, каталоги `prod` / `stage` / `dev` / `platform`, bucket для Terraform state, service accounts и ключи для env SA.
 
-## Quick start — без clone (Dev A / Dev B)
+**Для кого:** DevOps, который разворачивает облако. App-разработчики окружений к bootstrap state bucket не ходят — ключи им отдаёт DevOps.
 
-**Нужно:** Docker, IAM-токен. Для первого create — права на organization/billing (или `TF_VAR_cloud_id`).
+Секреты **не** лежат отдельным файлом в S3. Они внутри Terraform state в bucket `platform` (и после первого запуска — локально в каталоге `work/`). Lockbox не используется.
 
-Актуальный **version tag** и **digest** берите из [GitHub Releases](https://github.com/stupenkov/terraform-yc-bootstrap/releases) после первого релиза. До появления Release подставляйте tag/`@sha256:…` из notes вручную — не полагайтесь только на `latest`.
+---
+
+## 1. Задеплоить облако
+
+**Нужно:** Docker, IAM-токен. Для первого create — права на organization/billing **или** уже существующий `cloud_id`.
+
+### Токен
 
 ```bash
-# env-файл где угодно (можно скопировать из репозитория .env.example)
-# YC_TOKEN=...
-# Dev A create: TF_VAR_organization_id + TF_VAR_billing_account_id
-# или TF_VAR_cloud_id
-# Dev B join: достаточно YC_TOKEN
+yc iam create-token   # после yc init; живёт ~12 ч
+```
 
-# Pin: VERSION или @sha256:… из GitHub Releases (пример ниже — после первого релиза)
-IMAGE=stupean/terraform-yc-bootstrap:VERSION   # например :0.1.0
-docker pull "$IMAGE"
+Подробнее: [IAM-токен](https://yandex.cloud/ru/docs/iam/operations/iam-token/create).
 
-# Пустой каталог для локальных артефактов (не корень git-репозитория)
-mkdir -p work
+### `.env`
 
-docker run --rm --env-file .env \
+Скопируйте [.env.example](.env.example) и заполните:
+
+```bash
+YC_TOKEN=…
+BOOTSTRAP_AUTO_APPROVE=1
+
+# Новое облако — оба:
+TF_VAR_organization_id=…
+TF_VAR_billing_account_id=…
+
+# Или reuse существующего:
+# TF_VAR_cloud_id=…
+```
+
+### Запуск
+
+```bash
+mkdir -p work && docker run --rm --env-file .env \
   -v "$PWD/work:/work" \
-  "$IMAGE" \
+  stupean/terraform-yc-bootstrap:latest \
   bootstrap
 ```
 
-- `bootstrap` — smart: attach к существующему workspace или create + migrate.
-- Только attach: замените команду на `join`.
-- `-v …/work:/work` — сохранить `backend.hcl` / `.backend-credentials` / `.terraform` для day-two; без volume — ephemeral.
-- Если смонтировать корень этого репозитория как `/work`, entrypoint пишет в `.yc-bootstrap-work/` (gitignored), а не засоряет checkout.
+После успеха: folders, state bucket, SA и ключи; state в Object Storage. Секреты и backend-конфиг — в `work/` (без volume запуск ephemeral).
 
-Day-two (тот же volume):
+Для воспроизводимого pin берите tag/digest из [GitHub Releases](https://github.com/stupenkov/terraform-yc-bootstrap/releases) вместо `latest`.
 
-```bash
-docker run --rm --env-file .env -v "$PWD/work:/work" \
-  "$IMAGE" plan
-# … apply | output
-```
+---
 
-Образ собирается из этого репозитория (`Dockerfile`). Локально:
+## 2. Достать секреты
 
-```bash
-docker build -t stupean/terraform-yc-bootstrap:local .
-```
+После bootstrap с volume смотрите файлы в `work/` (в clone+Compose — в `terraform/`).
 
-**Pin:** immutable version tag (`:X.Y.Z`) или digest (`@sha256:…` из Release notes). Tag `latest` обновляется при релизе и удобен для экспериментов, но не для воспроизводимого pin. Base runtime внутри — `stupean/yandex-terraform@sha256:e55da7ecc64d3cff1048900f856b84ec6228e2568f1b64f09154500f932bd417`.
+### AWS keys — доступ к state bucket (S3 API)
 
-Как выходят релизы: Conventional Commits → Release PR (release-please) → merge → в том же workflow tag + Docker Hub. Подробности — в [CONTRIBUTING.md](CONTRIBUTING.md).
+Нужны Terraform S3 backend и любому, кто читает/пишет bootstrap state.
 
-Lockbox не используется. Не копируйте `backend.hcl` / `.backend-credentials` с чужой машины.
-
-Если найдено несколько workspace — в env: `TFSTATE_BUCKET=…` (опционально `TF_VAR_cloud_id`).
-
-## Разработка модуля (clone + Compose)
-
-```text
-.
-├── Dockerfile / docker-compose.yml / .env.example
-├── docker/entrypoint.sh
-├── terraform/          # root module
-├── scripts/            # bootstrap / join
-└── examples/           # *.example
-```
+| Откуда | Что |
+|--------|-----|
+| **Локально (проще)** | `.backend-credentials` → `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` |
+| **Из state в S3** | через Terraform outputs (state уже в bucket): |
 
 ```bash
-cp .env.example .env   # заполнить YC_TOKEN и TF_VAR_*
-docker compose pull
-docker compose run --rm bootstrap
-# attach-only: docker compose run --rm join
-# terraform:    docker compose run --rm tf plan|apply|output
+docker run --rm --env-file .env -v "$PWD/work:/work" stupean/terraform-yc-bootstrap:latest \
+  output -raw tfstate_access_key
+
+docker run --rm --env-file .env -v "$PWD/work:/work" stupean/terraform-yc-bootstrap:latest \
+  output -raw tfstate_secret_key
 ```
 
-Terraform working directory — `terraform/`; AWS keys пишутся в `terraform/.backend-credentials`.
+Это static keys SA `tfstate`, не отдельный object в bucket рядом с `workspace.json`.
+
+### Authorized keys — SA каталогов `prod` / `stage` / `dev`
+
+Нужны env Terraform roots и CI от имени `terraform-<env>`.
+
+| Откуда | Что |
+|--------|-----|
+| **Локально (проще)** | `terraform-<env>-authorized-key.json` (например `terraform-stage-authorized-key.json`) |
+| **Из state в S3** | output `terraform_env_sa_key_json` (map по env) |
+
+```bash
+# пример для stage
+export YC_SERVICE_ACCOUNT_KEY_FILE=work/terraform-stage-authorized-key.json
+```
+
+В CI положите содержимое JSON в secret store; app-разработчикам отдайте файл/secret, **не** доступ к bootstrap bucket.
+
+`join` на второй машине выпускает новые AWS keys для state, но **не** пишет заново env SA JSON — их берут из state (`output`) или с машины, где делали первый bootstrap.
+
+---
+
+## 3. Day-two и вторая машина DevOps
+
+Тот же `work/` и `.env`:
+
+```bash
+docker run --rm --env-file .env -v "$PWD/work:/work" stupean/terraform-yc-bootstrap:latest plan
+# apply | output
+```
+
+Только подключиться к уже созданному workspace (peer DevOps):
+
+```bash
+docker run --rm --env-file .env -v "$PWD/work:/work" stupean/terraform-yc-bootstrap:latest join
+```
+
+Несколько workspace в org — задайте `TFSTATE_BUCKET=…` в `.env`.
+
+---
 
 ## Что создаётся
 
@@ -82,12 +119,31 @@ Terraform working directory — `terraform/`; AWS keys пишутся в `terraf
 |--------|------------|
 | Cloud (опционально) + billing | Новое облако |
 | Folders `prod`, `stage`, `dev`, `platform` | Окружения + shared |
-| Bucket в `platform` | Terraform state + `bootstrap/workspace.json` |
-| SA `bootstrap` / `tfstate` / `terraform-*` | Роли на структуру, state и env-каталоги |
+| Bucket в `platform` | Terraform state + `bootstrap/workspace.json` (без секретов) |
+| SA `tfstate` + static keys | S3 backend (`AWS_*`) |
+| SA `terraform-*` + authorized keys | Provider/CI для env-каталогов |
+| SA `bootstrap` | Админ структуры platform/cloud |
+
+---
+
+## Разработка модуля (clone)
+
+```bash
+cp .env.example .env
+docker compose pull
+docker compose run --rm bootstrap
+# join |  docker compose run --rm tf plan|apply|output
+```
+
+Рабочий каталог Terraform — `terraform/`; секреты: `.backend-credentials`, `terraform-*-authorized-key.json`.
+
+Сборка образа и релизы — [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
 
 ## Notes
 
-- Не коммитьте: `.env`, `terraform/.workspace.env`, `terraform/.backend-credentials`, `terraform/backend.hcl`, `terraform/backend.tf`, `.yc-bootstrap-work/`, `*.tfstate*`.
-- Provider lock: `terraform/.terraform.lock.hcl` (в корне репо его быть не должно).
-- Workspace без `workspace.json`: один раз `bootstrap`/`apply` с машины, где есть state.
+- Не коммитьте: `.env`, `.backend-credentials`, `*authorized_key*.json`, `backend.hcl`, `backend.tf`, `.yc-bootstrap-work/`, `*.tfstate*`.
+- Не копируйте credentials с чужой машины — у каждого DevOps свои AWS keys (mint на join) или свой volume.
+- Если смонтировать корень git-репо как `/work`, артефакты пишутся в `.yc-bootstrap-work/` (gitignored).
 - Параллельные `apply` к одному state пока без locking.
