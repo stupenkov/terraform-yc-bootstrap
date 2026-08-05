@@ -26,6 +26,7 @@ terraform/backend.tf
 *.pem
 *sa-key*.json
 *authorized_key*.json
+*authorized-key*.json
 
 # tfvars with secrets (keep examples/ tracked)
 terraform.tfvars
@@ -41,3 +42,4 @@ terraform/terraform.tfvars
 .vscode/
 *.swp
 .DS_Store
+*:Zone.Identifier
