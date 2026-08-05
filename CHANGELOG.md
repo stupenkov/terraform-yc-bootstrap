@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/stupenkov/terraform-yc-bootstrap/compare/v1.0.0...v1.1.0) (2026-08-05)
+
+
+### Features
+
+* provision authorized keys for env terraform service accounts ([7db9c90](https://github.com/stupenkov/terraform-yc-bootstrap/commit/7db9c90dbeeb7cb1345960cd22ad6c7bec1daf76))
+
 ## 1.0.0 (2026-08-04)
 
 
