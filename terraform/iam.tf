@@ -49,6 +49,31 @@ resource "yandex_resourcemanager_folder_iam_member" "terraform_env_editor" {
   member    = "serviceAccount:${yandex_iam_service_account.terraform_env[each.key].id}"
 }
 
+resource "yandex_iam_service_account_key" "terraform_env" {
+  for_each = yandex_iam_service_account.terraform_env
+
+  service_account_id = each.value.id
+  description        = "Authorized key for terraform-${each.key}"
+  key_algorithm      = "RSA_2048"
+}
+
+locals {
+  terraform_env_sa_key_json = {
+    for k, key in yandex_iam_service_account_key.terraform_env : k => jsonencode({
+      id                 = key.id
+      service_account_id = key.service_account_id
+      created_at         = key.created_at
+      key_algorithm      = key.key_algorithm
+      public_key         = key.public_key
+      private_key        = key.private_key
+    })
+  }
+
+  terraform_env_sa_key_filenames = {
+    for k in keys(yandex_iam_service_account_key.terraform_env) : k => "terraform-${k}-authorized-key.json"
+  }
+}
+
 resource "local_sensitive_file" "backend_credentials" {
   count = var.write_backend_credentials ? 1 : 0
 
@@ -60,4 +85,12 @@ resource "local_sensitive_file" "backend_credentials" {
     AWS_ACCESS_KEY_ID=${yandex_iam_service_account_static_access_key.tfstate.access_key}
     AWS_SECRET_ACCESS_KEY=${yandex_iam_service_account_static_access_key.tfstate.secret_key}
   EOT
+}
+
+resource "local_sensitive_file" "terraform_env_sa_key" {
+  for_each = var.write_env_sa_keys ? yandex_iam_service_account_key.terraform_env : {}
+
+  filename        = local.terraform_env_sa_key_filenames[each.key]
+  file_permission = "0600"
+  content         = local.terraform_env_sa_key_json[each.key]
 }

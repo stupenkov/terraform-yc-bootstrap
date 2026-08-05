@@ -67,3 +67,9 @@ variable "backend_credentials_path" {
   type        = string
   default     = ".backend-credentials"
 }
+
+variable "write_env_sa_keys" {
+  description = "If true, write per-env Terraform SA authorized key JSON files locally (gitignored; for YC_SERVICE_ACCOUNT_KEY_FILE)"
+  type        = bool
+  default     = true
+}

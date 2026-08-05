@@ -46,6 +46,12 @@ output "tfstate_secret_key" {
   sensitive   = true
 }
 
+output "terraform_env_sa_key_json" {
+  description = "Authorized key JSON per env (prod/stage/dev) for YC_SERVICE_ACCOUNT_KEY_FILE; also stored in Terraform state"
+  value       = local.terraform_env_sa_key_json
+  sensitive   = true
+}
+
 output "backend_config_hint" {
   description = "Hints for configuring the S3 backend after first apply"
   value = {
@@ -60,6 +66,17 @@ output "backend_config_hint" {
     backend_template   = "backend.tf.in"
     backend_config_hcl = "backend.hcl"
     init_migrate       = "terraform init -migrate-state -force-copy -backend-config=backend.hcl"
-    join_hint          = "docker compose run --rm join  # or smart bootstrap with YC_TOKEN only"
+    join_hint          = "docker compose run --rm join  # peer DevOps / second machine only — not for app env developers"
+  }
+}
+
+output "env_sa_keys_hint" {
+  description = "How to use per-env Terraform SA authorized keys (DevOps handoff to CI / env roots)"
+  value = {
+    write_local_files = var.write_env_sa_keys
+    local_files       = var.write_env_sa_keys ? local.terraform_env_sa_key_filenames : null
+    output_name       = "terraform_env_sa_key_json"
+    usage_example     = "YC_SERVICE_ACCOUNT_KEY_FILE=terraform-stage-authorized-key.json"
+    note              = "Keys live in bootstrap Terraform state (platform bucket). Do not publish as S3 objects. Access to state = access to keys."
   }
 }

@@ -21,3 +21,4 @@ folder_names = {
 bucket_name_prefix        = "tfstate"
 bootstrap_state_key       = "bootstrap/terraform.tfstate"
 write_backend_credentials = true
+write_env_sa_keys         = true
